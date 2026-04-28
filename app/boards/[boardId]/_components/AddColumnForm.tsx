@@ -16,7 +16,7 @@ export function AddColumnForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="shrink-0 w-72 rounded-lg border border-dashed border-black/15 dark:border-white/20 p-3 text-sm text-zinc-600 dark:text-zinc-400 hover:border-black/40 dark:hover:border-white/40"
+        className="shrink-0 w-72 rounded-lg border border-black/15 dark:border-white/20 p-3 text-sm text-zinc-600 dark:text-zinc-400 hover:border-black/40 dark:hover:border-white/40"
       >
         + Sütun ekle
       </button>

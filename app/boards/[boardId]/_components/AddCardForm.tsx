@@ -16,7 +16,7 @@ export function AddCardForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full rounded-md border border-dashed border-black/15 dark:border-white/20 px-2 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:border-black/40 dark:hover:border-white/40"
+        className="w-full rounded-md border border-black/15 dark:border-white/20 px-2 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:border-black/40 dark:hover:border-white/40"
       >
         + Kart ekle
       </button>
