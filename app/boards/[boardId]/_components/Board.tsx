@@ -31,13 +31,13 @@ import {
   addCardAction,
   updateCardAction,
   deleteCardAction,
-  moveCardAction,
+  reorderCardsAction,
 } from "@/lib/actions/cards";
 import {
   addColumnAction,
   renameColumnAction,
   deleteColumnAction,
-  moveColumnAction,
+  reorderColumnsAction,
 } from "@/lib/actions/columns";
 
 import { Column } from "./Column";
@@ -74,6 +74,7 @@ export function Board({ initialBoard }: { initialBoard: BoardWithChildren }) {
   // active.data.current.columnId because dnd-kit updates it live as the card
   // moves to a new column during dragOver.
   const dragOriginColumnRef = useRef<string | null>(null);
+  const dragOriginIndexRef = useRef<number | null>(null);
 
   // Re-seed when the server data identity changes (after navigation/refresh).
   const seededRef = useRef(initialBoard);
@@ -117,6 +118,8 @@ export function Board({ initialBoard }: { initialBoard: BoardWithChildren }) {
       if (card) {
         setActiveCard(card);
         dragOriginColumnRef.current = col!.id;
+        dragOriginIndexRef.current =
+          col?.cards.findIndex((c) => c.id === cardId) ?? null;
       }
     } else if (active.data.current?.type === "column") {
       const col = cols.find((c) => c.id === active.id);
@@ -143,7 +146,23 @@ export function Board({ initialBoard }: { initialBoard: BoardWithChildren }) {
         ? overId
         : (over.data.current?.columnId as string | undefined);
     if (!overColumnId) return;
-    if (sourceCol.id === overColumnId) return; // same-column sort handled in dragEnd
+
+    if (sourceCol.id === overColumnId) {
+      if (over.data.current?.type !== "card" || overId === activeCardId) return;
+
+      const oldIdx = sourceCol.cards.findIndex((c) => c.id === activeCardId);
+      const newIdx = sourceCol.cards.findIndex((c) => c.id === overId);
+      if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return;
+
+      setColumns((cols) =>
+        cols.map((col) =>
+          col.id === sourceCol.id
+            ? { ...col, cards: arrayMove(col.cards, oldIdx, newIdx) }
+            : col
+        )
+      );
+      return;
+    }
 
     const next = prev.map((c) => ({ ...c, cards: [...c.cards] }));
     const sourceColNext = next.find((c) => c.id === sourceCol.id)!;
@@ -169,9 +188,11 @@ export function Board({ initialBoard }: { initialBoard: BoardWithChildren }) {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     const originColumnId = dragOriginColumnRef.current;
+    const originIndex = dragOriginIndexRef.current;
     setActiveCard(null);
     setActiveColumn(null);
     dragOriginColumnRef.current = null;
+    dragOriginIndexRef.current = null;
 
     if (!over) return;
 
@@ -185,45 +206,48 @@ export function Board({ initialBoard }: { initialBoard: BoardWithChildren }) {
       );
       if (!currentCol) return;
 
-      const oldIdx = currentCol.cards.findIndex((c) => c.id === cardId);
-      let newIdx = oldIdx;
-      if (over.data.current?.type === "card" && over.id !== active.id) {
-        const overIdx = currentCol.cards.findIndex((c) => c.id === over.id);
-        if (overIdx >= 0) newIdx = overIdx;
-      }
-
-      const reorderedCards =
-        oldIdx !== newIdx
-          ? arrayMove(currentCol.cards, oldIdx, newIdx)
-          : currentCol.cards;
+      const reorderedCards = currentCol.cards;
       const finalIdx = reorderedCards.findIndex((c) => c.id === cardId);
+      if (finalIdx === -1) return;
 
       const sameColumn = originColumnId === currentCol.id;
-      // No-op: never left original column AND index unchanged.
-      if (sameColumn && oldIdx === newIdx) return;
+      // No-op: never left original column AND ended at the original index.
+      if (sameColumn && originIndex === finalIdx) return;
 
-      const prevPos = reorderedCards[finalIdx - 1]?.position ?? null;
-      const nextPos = reorderedCards[finalIdx + 1]?.position ?? null;
+      const cardsWithFreshPositions: CardT[] = [];
+      const updates: { id: string; columnId: string; position: string }[] = [];
+      let lastPosition: string | null = null;
 
-      let newPos: string;
       try {
-        newPos = generateKeyBetween(prevPos, nextPos);
+        for (const card of reorderedCards) {
+          const position = generateKeyBetween(lastPosition, null);
+          lastPosition = position;
+          cardsWithFreshPositions.push({
+            ...card,
+            position,
+            column_id: currentCol.id,
+          });
+          const movedBetweenColumns =
+            card.id === cardId && originColumnId !== currentCol.id;
+          if (
+            movedBetweenColumns ||
+            card.position !== position ||
+            card.column_id !== currentCol.id
+          ) {
+            updates.push({ id: card.id, columnId: currentCol.id, position });
+          }
+        }
       } catch (e) {
         console.error("position generation failed", e);
         return;
       }
 
-      const newCards = reorderedCards.map((c) =>
-        c.id === cardId
-          ? { ...c, position: newPos, column_id: currentCol.id }
-          : c
-      );
       const newCols = prev.map((c) =>
-        c.id === currentCol.id ? { ...c, cards: newCards } : c
+        c.id === currentCol.id ? { ...c, cards: cardsWithFreshPositions } : c
       );
       setColumns(newCols);
 
-      moveCardAction(cardId, currentCol.id, newPos).then((result) => {
+      reorderCardsAction(updates).then((result) => {
         if (!result.ok) {
           setColumns(prev);
           setError(`Kart kaydedilemedi: ${result.error}`);
@@ -246,23 +270,27 @@ export function Board({ initialBoard }: { initialBoard: BoardWithChildren }) {
       if (oldIdx === -1 || newIdx === -1 || oldIdx === newIdx) return;
 
       const reordered = arrayMove(prev, oldIdx, newIdx);
-      const prevPos = reordered[newIdx - 1]?.position ?? null;
-      const nextPos = reordered[newIdx + 1]?.position ?? null;
+      const updates: { id: string; position: string }[] = [];
+      let lastPosition: string | null = null;
 
-      let newPos: string;
+      let newCols: ColumnState[];
       try {
-        newPos = generateKeyBetween(prevPos, nextPos);
+        newCols = reordered.map((column) => {
+          const position = generateKeyBetween(lastPosition, null);
+          lastPosition = position;
+          if (column.position !== position) {
+            updates.push({ id: column.id, position });
+          }
+          return { ...column, position };
+        });
       } catch (e) {
         console.error("position generation failed", e);
         return;
       }
 
-      const newCols = reordered.map((c) =>
-        c.id === activeId ? { ...c, position: newPos } : c
-      );
       setColumns(newCols);
 
-      moveColumnAction(activeId, newPos).then((result) => {
+      reorderColumnsAction(updates).then((result) => {
         if (!result.ok) {
           setColumns(prev);
           setError(`Sütun kaydedilemedi: ${result.error}`);

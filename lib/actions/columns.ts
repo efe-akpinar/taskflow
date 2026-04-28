@@ -71,3 +71,27 @@ export async function moveColumnAction(
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+export async function reorderColumnsAction(
+  updates: { id: string; position: string }[]
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (updates.length === 0) return { ok: true };
+
+  const supabase = await createClient();
+
+  const results = await Promise.all(
+    updates.map((update) =>
+      supabase
+        .from("columns")
+        .update({ position: update.position })
+        .eq("id", update.id)
+        .select("id")
+        .single()
+    )
+  );
+
+  const failed = results.find((result) => result.error);
+  if (failed?.error) return { ok: false, error: failed.error.message };
+
+  return { ok: true };
+}

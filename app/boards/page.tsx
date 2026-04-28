@@ -50,11 +50,6 @@ export default async function BoardsPage() {
             </form>
           </div>
 
-          {boards.length === 0 && (
-            <p className="rounded-lg border border-dashed border-zinc-800 px-4 py-5 text-sm text-zinc-400">
-              Henüz board yok. İlk boardunu oluşturarak başlayabilirsin.
-            </p>
-          )}
         </section>
       </main>
     </div>
