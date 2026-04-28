@@ -19,6 +19,8 @@ export type Card = {
   column_id: string;
   title: string;
   description: string | null;
+  start_date: string | null;
+  due_date: string | null;
   position: string;
   created_at: string;
   updated_at: string;

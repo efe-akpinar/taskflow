@@ -316,7 +316,9 @@ export function Board({ initialBoard }: { initialBoard: BoardWithChildren }) {
   const handleUpdateCard = async (
     id: string,
     title: string,
-    description: string
+    description: string,
+    startDate: string,
+    dueDate: string
   ) => {
     const snapshot = columns;
     setColumns((prev) =>
@@ -324,12 +326,24 @@ export function Board({ initialBoard }: { initialBoard: BoardWithChildren }) {
         ...col,
         cards: col.cards.map((c) =>
           c.id === id
-            ? { ...c, title: title.trim(), description: description.trim() || null }
+            ? {
+                ...c,
+                title: title.trim(),
+                description: description.trim() || null,
+                start_date: startDate || null,
+                due_date: dueDate || null,
+              }
             : c
         ),
       }))
     );
-    const result = await updateCardAction(id, title, description);
+    const result = await updateCardAction(
+      id,
+      title,
+      description,
+      startDate,
+      dueDate
+    );
     if (!result.ok) {
       setColumns(snapshot);
       setError(result.error);

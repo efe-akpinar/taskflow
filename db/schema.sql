@@ -22,6 +22,8 @@ create table public.cards (
   column_id uuid not null references public.columns(id) on delete cascade,
   title text not null check (char_length(title) between 1 and 240),
   description text,
+  start_date date,
+  due_date date,
   position text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

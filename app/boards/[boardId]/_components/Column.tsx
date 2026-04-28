@@ -12,7 +12,13 @@ import { AddCardForm } from "./AddCardForm";
 type Props = {
   column: ColumnT & { cards: CardT[] };
   onAddCard: (columnId: string, title: string) => Promise<void>;
-  onUpdateCard: (id: string, title: string, description: string) => Promise<void>;
+  onUpdateCard: (
+    id: string,
+    title: string,
+    description: string,
+    startDate: string,
+    dueDate: string
+  ) => Promise<void>;
   onDeleteCard: (id: string) => Promise<void>;
   onRenameColumn: (id: string, title: string) => Promise<void>;
   onDeleteColumn: (id: string) => Promise<void>;

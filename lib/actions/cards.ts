@@ -38,15 +38,35 @@ export async function addCardAction(
 export async function updateCardAction(
   id: string,
   title: string,
-  description: string
+  description: string,
+  startDate: string,
+  dueDate: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const trimmed = title.trim();
   if (!id || !trimmed) return { ok: false, error: "Eksik alan." };
 
+  const normalizedStartDate = startDate || null;
+  const normalizedDueDate = dueDate || null;
+  if (
+    normalizedStartDate &&
+    normalizedDueDate &&
+    normalizedStartDate > normalizedDueDate
+  ) {
+    return {
+      ok: false,
+      error: "Başlangıç tarihi son teslim tarihinden sonra olamaz.",
+    };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("cards")
-    .update({ title: trimmed, description: description.trim() || null })
+    .update({
+      title: trimmed,
+      description: description.trim() || null,
+      start_date: normalizedStartDate,
+      due_date: normalizedDueDate,
+    })
     .eq("id", id);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
